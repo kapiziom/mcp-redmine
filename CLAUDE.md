@@ -102,4 +102,4 @@ zapis nadal odrzucany dla `read_only`, CLAUDE.md zaktualizowany przy zmianie arc
 8. **README** po angielsku (publiczna paczka NuGet); pozostałe dokumenty po polsku.
 9. Minimalna wspierana wersja Redmine nieustalona; brak wykrywania wersji (REST jej nie podaje).
 10. Docx/xlsx/pptx sprawdzone tylko na plikach generowanych w testach, nie na prawdziwych dokumentach z Worda/Excela (np. komentarze, nagłówki i stopki docx są pomijane).
-11. Nie utworzono commitów; wszystko jest w working tree.
+11. Historia ma 12 lokalnych commitów (moduły: config, secrets, redmine, clients, app, testy, build, docs); nic nie wypchnięto.
