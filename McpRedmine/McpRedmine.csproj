@@ -1,0 +1,45 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+    <PropertyGroup>
+        <TargetFramework>net10.0</TargetFramework>
+        <RuntimeIdentifiers>win-x64;win-arm64;osx-arm64;linux-x64;linux-arm64;linux-musl-x64</RuntimeIdentifiers>
+        <OutputType>Exe</OutputType>
+
+        <!-- Set up the NuGet package to be an MCP server -->
+        <PackAsTool>true</PackAsTool>
+        <PackageType>McpServer</PackageType>
+
+        <!-- Set up the MCP server to be a self-contained application that does not rely on a shared framework -->
+        <SelfContained>true</SelfContained>
+        <PublishSelfContained>true</PublishSelfContained>
+
+        <!-- Set up the MCP server to be a single file executable -->
+        <PublishSingleFile>true</PublishSingleFile>
+
+        <!-- Set recommended package metadata -->
+        <PackageReadmeFile>README.md</PackageReadmeFile>
+        <PackageId>Kapiziom.RedmineMcp</PackageId>
+        <Version>0.1.0-beta</Version>
+        <PackageTags>AI; MCP; server; stdio; Redmine</PackageTags>
+        <Description>Local MCP server (stdio) giving AI agents access to multiple Redmine instances through the standard REST API.</Description>
+    </PropertyGroup>
+
+    <!-- Include additional files for browsing the MCP server. -->
+    <ItemGroup>
+        <None Include=".mcp\server.json" Pack="true" PackagePath="/.mcp/" />
+        <None Include="README.md" Pack="true" PackagePath="/" />
+    </ItemGroup>
+
+    <ItemGroup>
+        <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.10" />
+        <PackageReference Include="ModelContextProtocol" Version="1.1.0" />
+    </ItemGroup>
+
+    <ItemGroup>
+      <ProjectReference Include="..\McpRedmine.Config\McpRedmine.Config.csproj" />
+      <ProjectReference Include="..\McpRedmine.Secrets\McpRedmine.Secrets.csproj" />
+      <ProjectReference Include="..\McpRedmine.Redmine\McpRedmine.Redmine.csproj" />
+      <ProjectReference Include="..\McpRedmine.Clients\McpRedmine.Clients.csproj" />
+    </ItemGroup>
+
+</Project>
