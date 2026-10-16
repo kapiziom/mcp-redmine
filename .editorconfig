@@ -1,0 +1,47 @@
+root = true
+
+[*]
+charset = utf-8
+indent_style = space
+indent_size = 4
+insert_final_newline = true
+end_of_line = crlf
+
+[*.cs]
+# Library-style API rules that add noise to an application (reserved VB keywords as member names, etc.).
+dotnet_diagnostic.CA1716.severity = none
+dotnet_diagnostic.CA1848.severity = none
+dotnet_diagnostic.CA2007.severity = none
+dotnet_diagnostic.CA1873.severity = none
+dotnet_diagnostic.CA1870.severity = none
+dotnet_diagnostic.CA1859.severity = none
+
+[McpRedmine.Tests/**.cs]
+dotnet_diagnostic.CA1707.severity = none
+dotnet_diagnostic.CA1816.severity = none
+dotnet_diagnostic.CA1305.severity = none
+dotnet_diagnostic.CA1861.severity = none
+
+[McpRedmine/Tools/**.cs]
+# Parameter names of tool methods are part of the MCP schema the model sees, so they are snake_case on purpose.
+dotnet_diagnostic.CA1707.severity = none
+
+[*.cs]
+# IDE style rules (IDE****) are advisory here. Real problems are caught by the compiler and the CA analyzers above.
+dotnet_analyzer_diagnostic.category-Style.severity = suggestion
+
+csharp_style_namespace_declarations = file_scoped:suggestion
+csharp_style_var_for_built_in_types = true:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = true:suggestion
+csharp_prefer_braces = false:silent
+csharp_style_expression_bodied_methods = when_on_single_line:silent
+csharp_style_prefer_primary_constructors = true:suggestion
+dotnet_style_prefer_collection_expression = when_types_loosely_match:suggestion
+dotnet_diagnostic.IDE0045.severity = suggestion
+dotnet_diagnostic.IDE0046.severity = suggestion
+dotnet_diagnostic.IDE0028.severity = suggestion
+dotnet_diagnostic.IDE0300.severity = suggestion
+dotnet_diagnostic.IDE0301.severity = suggestion
+dotnet_diagnostic.IDE0305.severity = suggestion
+dotnet_diagnostic.IDE0005.severity = suggestion

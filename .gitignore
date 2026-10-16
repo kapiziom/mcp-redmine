@@ -1,0 +1,27 @@
+bin/
+obj/
+/packages/
+riderModule.iml
+/_ReSharper.Caches/
+.idea
+
+# Local config and secrets
+.env
+.env.*
+*.local.json
+appsettings.Local.json
+*.apikey
+*.secret
+secrets/
+redmine-mcp.json
+RedmineMcp.json
+.claude\settings.local.json
+
+# Build / test output
+.vs/
+TestResults/
+*.nupkg
+*.snupkg
+
+# Local planning docs
+/.plans/
