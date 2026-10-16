@@ -92,7 +92,7 @@ Zależności: `McpRedmine` → wszystko; `Redmine` → `Config`, `Secrets`; `Cli
 zapis nadal odrzucany dla `read_only`, CLAUDE.md zaktualizowany przy zmianie architektury lub zasad.
 
 ## Założenia do potwierdzenia
-1. **Org/PackageId:** `Kapiziom.RedmineMcp` (z git user). `server.json` ma zgadnięte `io.github.kapiziom/redmine-mcp` i URL repo — popraw.
+1. **Org/PackageId:** `Kapiziom.RedmineMcp` (z git user). `server.json` wskazuje repo https://github.com/kapiziom/mcp-redmine.
 2. **Pakowanie:** zostaje self-contained RID-specific z szablonu (7 pakietów, ~230 MB/release). Alternatywa: jeden pakiet framework-dependent.
 3. **Windows:** rejestracja w klientach używa `cmd /c dnx ...`, bo `dnx` to `dnx.cmd` (odstępstwo od `-- dnx` z opisu zadania; potwierdzone, że bezpośrednie uruchomienie bez shella nie działa).
 4. **`http://`:** odrzucane, chyba że `allow_insecure_http`.
