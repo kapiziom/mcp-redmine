@@ -6,9 +6,13 @@ on:
   pull_request:
 
 jobs:
-  build:
-    name: build + test + pack (verify only, nothing is published)
-    runs-on: windows-latest
+  test:
+    name: build + test (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-latest, ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
@@ -16,4 +20,14 @@ jobs:
           dotnet-version: 10.0.x
       - run: dotnet build McpRedmine.sln --configuration Release
       - run: dotnet test McpRedmine.sln --configuration Release --no-build
+
+  pack:
+    name: pack (verify only, nothing is published)
+    runs-on: windows-latest
+    needs: test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
       - run: dotnet pack McpRedmine/McpRedmine.csproj --configuration Release --output ./artifacts
