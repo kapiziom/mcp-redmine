@@ -26,6 +26,15 @@ public sealed record TargetConfig
     /// <summary>Show people as initials plus id (e.g. "J.K. (#12)") instead of names in tool results. On by default.</summary>
     public bool RedactPeople { get; init; } = true;
 
+    /// <summary>
+    /// Mask e-mail addresses, keys/tokens/passwords and checksum-valid PESEL/NIP/IBAN/card numbers in free text
+    /// (descriptions, comments, subjects, attachment text) before it reaches the model. On by default.
+    /// </summary>
+    public bool RedactText { get; init; } = true;
+
+    /// <summary>E-mail domains (and their subdomains) that stay visible, e.g. your company or test domain.</summary>
+    public IReadOnlyList<string>? KeepEmailDomains { get; init; }
+
     public int EffectiveMaxRows => RowLimits.Clamp(MaxRows ?? RowLimits.DefaultMaxRows);
 
     public bool HasAllowlist => ProjectAllowlist is { Count: > 0 };

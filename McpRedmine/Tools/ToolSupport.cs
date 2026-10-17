@@ -1,5 +1,6 @@
 using McpRedmine.Config;
 using McpRedmine.Redmine;
+using McpRedmine.Redmine.Redaction;
 
 namespace McpRedmine.Tools;
 
@@ -22,6 +23,16 @@ internal static class ToolSupport
 
         return text[..maxLength] + $"... [truncated, {text.Length - maxLength} more characters]";
     }
+
+    /// <summary>A custom field value with text masked: strings and arrays of strings are scanned, other JSON is kept as is.</summary>
+    public static object? RedactValue(TextRedactor redactor, System.Text.Json.JsonElement value) => value.ValueKind switch
+    {
+        System.Text.Json.JsonValueKind.String => redactor.Redact(value.GetString()),
+        System.Text.Json.JsonValueKind.Array => value.EnumerateArray()
+            .Select(item => item.ValueKind == System.Text.Json.JsonValueKind.String ? (object?)redactor.Redact(item.GetString()) : item)
+            .ToList(),
+        _ => value,
+    };
 
     public static object? Ref(RedmineIdName? value) =>
         value is null ? null : new { value.Id, value.Name };

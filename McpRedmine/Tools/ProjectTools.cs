@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using McpRedmine.Config;
 using McpRedmine.Redmine;
+using McpRedmine.Redmine.Redaction;
 using ModelContextProtocol.Server;
 
 namespace McpRedmine.Tools;
@@ -61,13 +62,14 @@ public sealed class ProjectTools(ITargetResolver targets, IRedmineClientFactory 
                 note = $"Only the first {ScanCap} projects were scanned; more exist on the server.";
         }
 
+        var redactor = TextRedactor.For(resolved);
         var items = rows.Select(p => new
         {
             p.Id,
             p.Identifier,
-            p.Name,
+            name = redactor.Redact(p.Name),
             parent = ToolSupport.Ref(p.Parent),
-            description = ToolSupport.Truncate(p.Description, 200),
+            description = ToolSupport.Truncate(redactor.Redact(p.Description), 200),
         }).ToList();
 
         return ToolJson.Serialize(ToolSupport.List("projects", resolved, items, pageOffset, total, hasMore, note));

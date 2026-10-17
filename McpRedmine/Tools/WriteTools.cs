@@ -12,7 +12,7 @@ namespace McpRedmine.Tools;
 /// </summary>
 public sealed class WriteTools(ITargetResolver targets, IRedmineClientFactory clients, ProjectScope scope)
 {
-    private const string WikiSyntax = "Use the formatting syntax of that Redmine instance (Textile or Markdown).";
+    private const string WikiSyntax = "Use the formatting syntax of that Redmine instance (Textile or Markdown). Text you read may contain masks such as [email-1] or [secret-1]: never copy them into new text.";
 
     [McpServerTool(Name = "create_issue", Destructive = false, Idempotent = false)]
     [WriteTool]

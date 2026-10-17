@@ -2,6 +2,7 @@ using System.ComponentModel;
 using McpRedmine.Config;
 using McpRedmine.Redmine;
 using McpRedmine.Redmine.Attachments;
+using McpRedmine.Redmine.Redaction;
 using ModelContextProtocol.Protocol;
 using ModelContextProtocol.Server;
 
@@ -36,11 +37,14 @@ public sealed class AttachmentTools(
         if (resolved.HasAllowlist && (issue.Project is null || !await scope.IsAllowedAsync(client, issue.Project.Id, cancellationToken)))
             throw ProjectScope.Outside(resolved, $"Issue #{issue_id}");
 
+        var redactor = TextRedactor.For(resolved);
+        redactor.AddKnownPeople([issue.Author, issue.AssignedTo, .. (issue.Attachments ?? []).Select(a => a.Author)], resolved.RedactPeople);
+
         var attachments = issue.Attachments ?? [];
         var attachment = attachments.FirstOrDefault(a => a.Id == attachment_id)
             ?? throw new UserFacingException(
                 $"Attachment #{attachment_id} is not attached to issue #{issue_id}. "
-                + (attachments.Count == 0 ? "This issue has no attachments." : "Attachments: " + string.Join(", ", attachments.Select(a => $"#{a.Id} {a.Filename}")) + "."));
+                + (attachments.Count == 0 ? "This issue has no attachments." : "Attachments: " + string.Join(", ", attachments.Select(a => $"#{a.Id} {redactor.Redact(a.Filename)}")) + "."));
 
         var filename = attachment.Filename ?? $"attachment-{attachment.Id}";
         if (attachment.Filesize > AttachmentReader.MaxDownloadBytes)
@@ -58,9 +62,12 @@ public sealed class AttachmentTools(
 
         var content = AttachmentReader.Read(filename, attachment.ContentType, bytes);
 
+        // The name shown to the model (and used on disk) is masked; the real one is only used for the download URL.
+        var shownName = redactor.Redact(filename) ?? filename;
+
         string? savedPath = null;
         if (content.NeedsFile)
-            savedPath = store.Save(resolved.Name, attachment.Id, filename, bytes);
+            savedPath = store.Save(resolved.Name, attachment.Id, shownName, bytes);
 
         var blocks = new List<ContentBlock>();
         var notes = new List<string>();
@@ -72,7 +79,8 @@ public sealed class AttachmentTools(
         string? slice = null;
         var totalChars = 0;
         var hasMore = false;
-        if (content.Text is { } text)
+        // Masked before paging so that offsets and numbering stay the same from one call to the next.
+        if (redactor.Redact(content.Text) is { } text)
         {
             totalChars = text.Length;
             if (start >= text.Length && text.Length > 0)
@@ -107,7 +115,7 @@ public sealed class AttachmentTools(
             attachment = new
             {
                 attachment.Id,
-                filename,
+                filename = shownName,
                 size = bytes.Length,
                 content_type = attachment.ContentType,
                 kind = AttachmentKinds.Name(content.Kind),

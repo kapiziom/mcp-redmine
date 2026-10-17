@@ -3,6 +3,7 @@ using System.Text.Json;
 using McpRedmine.Config;
 using McpRedmine.Redmine;
 using McpRedmine.Redmine.Attachments;
+using McpRedmine.Redmine.Redaction;
 using ModelContextProtocol.Server;
 
 namespace McpRedmine.Tools;
@@ -57,10 +58,13 @@ public sealed class IssueTools(ITargetResolver targets, IRedmineClientFactory cl
                 note = $"{page.Items.Count - rows.Count} issue(s) from projects outside the allowlist were hidden.";
         }
 
+        var redactor = TextRedactor.For(resolved);
+        redactor.AddKnownPeople(rows.Select(i => i.AssignedTo), resolved.RedactPeople);
+
         var items = rows.Select(i => new
         {
             i.Id,
-            i.Subject,
+            subject = redactor.Redact(i.Subject),
             status = i.Status?.Name,
             tracker = i.Tracker?.Name,
             priority = i.Priority?.Name,
@@ -95,13 +99,20 @@ public sealed class IssueTools(ITargetResolver targets, IRedmineClientFactory cl
             throw ProjectScope.Outside(resolved, $"Issue #{id}");
 
         var journals = (issue.Journals ?? []).ToList();
-        var shownJournals = journals.Skip(Math.Max(0, journals.Count - MaxJournals)).Select(j => MapJournal(j, resolved.RedactPeople)).ToList();
+
+        // Full names of people in this issue are also masked where they are mentioned inside text.
+        var redactor = TextRedactor.For(resolved);
+        redactor.AddKnownPeople(
+            [issue.Author, issue.AssignedTo, .. journals.Select(j => j.User), .. (issue.Attachments ?? []).Select(a => a.Author)],
+            resolved.RedactPeople);
+
+        var shownJournals = journals.Skip(Math.Max(0, journals.Count - MaxJournals)).Select(j => MapJournal(j, resolved.RedactPeople, redactor)).ToList();
 
         return ToolJson.Serialize(new
         {
             target = resolved.Name,
             issue.Id,
-            issue.Subject,
+            subject = redactor.Redact(issue.Subject),
             status = issue.Status?.Name,
             tracker = issue.Tracker?.Name,
             priority = issue.Priority?.Name,
@@ -117,28 +128,28 @@ public sealed class IssueTools(ITargetResolver targets, IRedmineClientFactory cl
             issue.EstimatedHours,
             issue.CreatedOn,
             issue.UpdatedOn,
-            description = ToolSupport.Truncate(issue.Description, MaxDescription),
+            description = ToolSupport.Truncate(redactor.Redact(issue.Description), MaxDescription),
             custom_fields = (issue.CustomFields ?? [])
                 .Where(f => HasValue(f.Value))
-                .Select(f => new { f.Id, f.Name, f.Value })
+                .Select(f => new { f.Id, f.Name, value = ToolSupport.RedactValue(redactor, f.Value) })
                 .ToList(),
             journals = include_journals ? shownJournals : null,
             journals_total = include_journals && journals.Count > MaxJournals ? journals.Count : (int?)null,
             attachments = include_attachments
-                ? (issue.Attachments ?? []).Select(a => new { a.Id, a.Filename, size = a.Filesize, a.ContentType, kind = AttachmentKinds.Name(AttachmentKinds.Classify(a.Filename, a.ContentType)), author = PersonRedactor.Format(a.Author, resolved.RedactPeople), a.CreatedOn }).ToList()
+                ? (issue.Attachments ?? []).Select(a => new { a.Id, filename = redactor.Redact(a.Filename), size = a.Filesize, a.ContentType, kind = AttachmentKinds.Name(AttachmentKinds.Classify(a.Filename, a.ContentType)), author = PersonRedactor.Format(a.Author, resolved.RedactPeople), a.CreatedOn }).ToList()
                 : null,
         });
     }
 
-    private static object MapJournal(RedmineJournal journal, bool redact) => new
+    private static object MapJournal(RedmineJournal journal, bool redact, TextRedactor redactor) => new
     {
         journal.Id,
         user = PersonRedactor.Format(journal.User, redact),
         created_on = journal.CreatedOn,
-        notes = ToolSupport.Truncate(string.IsNullOrWhiteSpace(journal.Notes) ? null : journal.Notes, MaxNote),
+        notes = ToolSupport.Truncate(redactor.Redact(string.IsNullOrWhiteSpace(journal.Notes) ? null : journal.Notes), MaxNote),
         @private = journal.PrivateNotes == true ? true : (bool?)null,
         changes = journal.Details is { Count: > 0 }
-            ? journal.Details.Select(d => $"{(d.Property == "attr" ? d.Name : $"{d.Property}:{d.Name}")}: {AsText(d.OldValue)} -> {AsText(d.NewValue)}").ToList()
+            ? journal.Details.Select(d => redactor.Redact($"{(d.Property == "attr" ? d.Name : $"{d.Property}:{d.Name}")}: {AsText(d.OldValue)} -> {AsText(d.NewValue)}")).ToList()
             : null,
     };
 

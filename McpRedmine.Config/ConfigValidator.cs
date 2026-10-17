@@ -10,6 +10,9 @@ public static partial class ConfigValidator
     [GeneratedRegex("^[A-Za-z_][A-Za-z0-9_]*$")]
     private static partial Regex EnvVarPattern();
 
+    [GeneratedRegex(@"^[A-Za-z0-9]([A-Za-z0-9.-]*[A-Za-z0-9])?$")]
+    private static partial Regex DomainPattern();
+
     /// <param name="config">Config to check.</param>
     /// <param name="fileExists">Injectable for tests; defaults to <see cref="File.Exists(string?)"/>.</param>
     public static IReadOnlyList<string> Validate(RedmineMcpConfig config, Func<string, bool>? fileExists = null)
@@ -37,6 +40,9 @@ public static partial class ConfigValidator
 
             if (target.ProjectAllowlist is { } allowlist && allowlist.Any(string.IsNullOrWhiteSpace))
                 errors.Add($"Target '{label}': project_allowlist must not contain empty entries.");
+
+            if (target.KeepEmailDomains is { } domains && domains.Any(d => !DomainPattern().IsMatch(d.Trim().TrimStart('@'))))
+                errors.Add($"Target '{label}': keep_email_domains entries must be plain domains such as example.com.");
 
             if (target.ApiKeyEnv is not null && !EnvVarPattern().IsMatch(target.ApiKeyEnv))
                 errors.Add($"Target '{label}': api_key_env '{target.ApiKeyEnv}' is not a valid environment variable name.");
