@@ -4,7 +4,7 @@ A local [MCP](https://modelcontextprotocol.io/) server (stdio) that lets AI agen
 instances** through the standard Redmine REST API. No Redmine plugin and no administrator rights needed.
 
 - Several Redmine instances in one server (different versions, VPN-only hosts, company CA). Every tool takes a `target`.
-- People are shown as initials, not names (configurable per target).
+- People are shown as initials, not names; e-mails, tokens, passwords and similar identifiers in text are masked (both configurable per target).
 - Read-only by default. Write tools are rejected server-side unless a target is explicitly `read_only: false`.
 - The API key is stored in your OS credential store (Windows Credential Manager, macOS Keychain, Secret Service) and
   is sent only in the `X-Redmine-API-Key` header. It never appears in a client config, a tool parameter or a log.
@@ -89,7 +89,9 @@ Without an OS credential store (e.g. a headless Linux box) the key falls back to
 | `project_allowlist` | Only these projects (identifier or id) are readable/writable on this target. |
 | `api_key_env` | Environment variable to read the key from when no stored key exists. |
 | `allow_insecure_http` | Permit plain `http://` (the key would travel unencrypted). |
-| `redact_people` | Default `true`: people appear as initials plus id (`J.K. (#12)`). Free text in descriptions and comments is not altered. |
+| `redact_people` | Default `true`: people appear as initials plus id (`J.K. (#12)`). |
+| `redact_text` | Default `true`: e-mail addresses, keys/tokens/passwords and checksum-valid PESEL/NIP/IBAN/card numbers in free text become placeholders such as `[email-1]`, `[secret-1]`. Images and saved PDFs are not scanned. |
+| `keep_email_domains` | E-mail domains (and their subdomains) that stay visible, e.g. `["example.com"]`. |
 
 Override the location with the `REDMINE_MCP_CONFIG` environment variable.
 

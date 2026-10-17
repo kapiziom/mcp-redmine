@@ -18,7 +18,7 @@ Pakiet jest self-contained, single-file, 6 RID (`dotnet pack` daje 7 plików po 
 ## Komendy (zweryfikowane)
 ```
 dotnet build McpRedmine.sln
-dotnet test McpRedmine.sln                    # 270 testów, ~12 s; zawiera e2e na prawdziwej binarce przez stdio
+dotnet test McpRedmine.sln                    # 304 testy, ~12 s; zawiera e2e na prawdziwej binarce przez stdio
 dotnet pack McpRedmine/McpRedmine.csproj -c Release -o <dir>
 dnx Kapiziom.RedmineMcp --version 0.1.0-beta --source <dir> --yes -- <podkomenda>   # z lokalnego źródła; bez -- też działa
 dotnet McpRedmine/bin/Debug/net10.0/win-x64/McpRedmine.dll [serve|setup|doctor|accounts ...]
@@ -32,7 +32,7 @@ McpRedmine.sln, global.json, Directory.Build.props, .editorconfig
 McpRedmine.Config/    TargetConfig, ConfigStore (JSON snake_case, zapis atomowy), ConfigValidator, TargetResolver, UserFacingException
 McpRedmine.Secrets/   ApiKey (ToString zamaskowany), ISecretStore: WindowsCredentialStore (P/Invoke), MacKeychainStore,
                       LibSecretStore (CLI, sekret przez stdin), FileSecretStore (600), ApiKeyResolver (OS → env → plik)
-McpRedmine.Redmine/   RedmineClient (GET z paginacją, POST/PUT, pobieranie plików z limitem), PersonRedactor, Attachments/ (OfficeText: docx/xlsx/pptx bez bibliotek, AttachmentReader, AttachmentStore), ApiKeyHandler (jedyne miejsce z kluczem), RedmineQuery,
+McpRedmine.Redmine/   RedmineClient (GET z paginacją, POST/PUT, pobieranie plików z limitem), PersonRedactor, Redaction/TextRedactor (maskowanie maili, sekretów, PESEL/NIP/IBAN/kart), Attachments/ (OfficeText: docx/xlsx/pptx bez bibliotek, AttachmentReader, AttachmentStore), ApiKeyHandler (jedyne miejsce z kluczem), RedmineQuery,
                       IssueSearch, ProjectScope (allowlista), CustomCaValidator, AddRedmine() (klient HTTP per target + resilience)
 McpRedmine.Clients/   ClaudeCli, ClaudeCodeInstaller, JsonConfigInstaller (Claude Desktop, Cursor), ServerRegistration
 McpRedmine/           Program → Cli/CommandRouter → ServeCommand | SetupCommand | DoctorCommand | AccountsCommand; Tools/
@@ -59,7 +59,12 @@ Zależności: `McpRedmine` → wszystko; `Redmine` → `Config`, `Secrets`; `Cli
   Limity: pobranie 25 MB, obraz inline 4 MB, część OOXML 40 MB po rozpakowaniu, tekst 40 tys. znaków na wywołanie (`offset`/`max_chars`). DTD w XML zabronione.
   Obrazy osadzone w docx/xlsx/pptx: `include_embedded_images` (max 5). Brak stanu „co agent już widział” — decyduje agent; pobrane bajty cache'owane w pamięci 10 min.
 - **Redakcja osób** (`redact_people`, domyślnie `true`): autor, przypisany, użytkownik w dzienniku, autor załącznika → inicjały + id (`J.K. (#12)`);
-  `whoami` bez loginu i nazwiska. Dotyczy pól strukturalnych; **tekst opisów i komentarzy nie jest czyszczony** (imiona w treści, maile, telefony).
+  `whoami` bez loginu i nazwiska.
+- **Maskowanie tekstu** (`redact_text`, domyślnie `true`; `keep_email_domains` zostawia wskazane domeny): w opisach, komentarzach, temacie, polach własnych,
+  nazwach plików i tekście załączników maile → `[email-N]`, klucze/tokeny/hasła (`password=…`, hasła w URL, Bearer, JWT, klucze prywatne, ghp_/glpat-/AKIA…) → `[secret-N]`,
+  PESEL/NIP/IBAN/karty (tylko z poprawną sumą kontrolną) → `[pesel-N]` itd. Ten sam adres ma tę samą maskę w obrębie jednej odpowiedzi (`TextRedactor` na wywołanie).
+  Pełne imiona użytkowników tego samego zgłoszenia w treści → `J.K. (#id)`; imion spoza zgłoszenia nie da się wiarygodnie wykryć. Regexy mają timeout (fail-closed).
+  **Nie obejmuje obrazów** (zrzuty ekranu, obrazy osadzone w docx) ani zapisanych na dysk PDF-ów. Opisy narzędzi zapisu każą nie przepisywać masek do nowego tekstu.
 - Brak RAG, brak bazy lokalnej: serwer jest bezstanowy poza cache'ami (id projektów w pamięci, bajty załączników w pamięci, pliki na dysku 7 dni).
 - Allowlista dotyczy samego projektu (bez podprojektów); `search_issues` wymaga wtedy `project_id`, `get_issue`/`add_issue_note`/`log_time` sprawdzają projekt zgłoszenia.
 
