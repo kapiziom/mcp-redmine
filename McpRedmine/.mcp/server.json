@@ -1,12 +1,12 @@
 {
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-10-17/server.schema.json",
   "description": "Local MCP server giving AI agents access to multiple Redmine instances through the standard REST API.",
-  "name": "io.github.kapiziom/mcp-redmine",
+  "name": "kapiziom/mcp-redmine",
   "version": "0.1.0-beta",
   "packages": [
     {
       "registryType": "nuget",
-      "identifier": "Kapiziom.RedmineMcp",
+      "identifier": "kapiziom.RedmineMcp",
       "version": "0.1.0-beta",
       "transport": {
         "type": "stdio"
