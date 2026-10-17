@@ -18,9 +18,9 @@ instances** through the standard Redmine REST API. No Redmine plugin and no admi
 Replace `X.Y.Z` with the version you want (it is pinned in your MCP client).
 
 ```
-dnx Kapiziom.RedmineMcp --version X.Y.Z --yes -- setup           # register in Claude Code / Claude Desktop / Cursor
-dnx Kapiziom.RedmineMcp --version X.Y.Z --yes -- accounts add    # add a Redmine instance; the key is asked for with hidden input
-dnx Kapiziom.RedmineMcp --version X.Y.Z --yes -- doctor          # check .NET, config, REST API and the key
+dnx kapiziom.RedmineMcp --version X.Y.Z --yes -- setup           # register in Claude Code / Claude Desktop / Cursor
+dnx kapiziom.RedmineMcp --version X.Y.Z --yes -- accounts add    # add a Redmine instance; the key is asked for with hidden input
+dnx kapiziom.RedmineMcp --version X.Y.Z --yes -- doctor          # check .NET, config, REST API and the key
 ```
 
 `setup --dry-run` shows what would change without touching anything; `--client claude-code|claude-desktop|cursor`

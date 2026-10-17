@@ -122,4 +122,4 @@ The solution layout, conventions and security rules are described in [CLAUDE.md]
 
 ## Status
 
-Implemented and covered by tests against stubbed HTTP and a fake Redmine. Not yet verified: a real Redmine instance, macOS and Linux credential stores, and real-world Word/Excel documents.
+Covered by tests against stubbed HTTP and a fake Redmine, and used against a real Redmine instance. Not yet verified: macOS and Linux credential stores.

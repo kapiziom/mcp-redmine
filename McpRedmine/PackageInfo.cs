@@ -5,7 +5,7 @@ namespace McpRedmine;
 public static class PackageInfo
 {
     /// <summary>Must match <c>PackageId</c> in the csproj (a test enforces it).</summary>
-    public const string PackageId = "Kapiziom.RedmineMcp";
+    public const string PackageId = "kapiziom.RedmineMcp";
 
     /// <summary>Version of the running build, without the source-control suffix ("0.1.0-beta+abc" -> "0.1.0-beta").</summary>
     public static string Version

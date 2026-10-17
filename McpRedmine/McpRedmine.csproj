@@ -18,7 +18,7 @@
 
         <!-- Set recommended package metadata -->
         <PackageReadmeFile>README.md</PackageReadmeFile>
-        <PackageId>Kapiziom.RedmineMcp</PackageId>
+        <PackageId>kapiziom.RedmineMcp</PackageId>
         <Version>0.1.0-beta</Version>
         <PackageTags>AI; MCP; server; stdio; Redmine</PackageTags>
         <Description>Local MCP server (stdio) giving AI agents access to multiple Redmine instances through the standard REST API.</Description>
