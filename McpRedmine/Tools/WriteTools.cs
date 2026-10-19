@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Globalization;
 using McpRedmine.Config;
 using McpRedmine.Redmine;
+using McpRedmine.Redmine.Redaction;
 using ModelContextProtocol.Server;
 
 namespace McpRedmine.Tools;
@@ -29,6 +30,11 @@ public sealed class WriteTools(ITargetResolver targets, IRedmineClientFactory cl
         CancellationToken cancellationToken = default)
     {
         var resolved = targets.Resolve(target);
+        WriteInput.RejectSecrets(subject, "subject");
+        WriteInput.RejectSecrets(description, "description");
+        foreach (var value in custom_fields?.Values.ToList() ?? [])
+            WriteInput.RejectSecrets(value, "custom_fields");
+
         var input = new NewIssue(
             WriteInput.ProjectKey(project_id),
             WriteInput.Subject(subject),
@@ -63,6 +69,7 @@ public sealed class WriteTools(ITargetResolver targets, IRedmineClientFactory cl
         CancellationToken cancellationToken = default)
     {
         var resolved = targets.Resolve(target);
+        WriteInput.RejectSecrets(notes, "notes");
         var text = WriteInput.Text(notes, "notes") ?? throw new UserFacingException("Invalid 'notes': must not be empty.");
 
         var client = clients.Create(resolved);
@@ -87,6 +94,7 @@ public sealed class WriteTools(ITargetResolver targets, IRedmineClientFactory cl
         CancellationToken cancellationToken = default)
     {
         var resolved = targets.Resolve(target);
+        WriteInput.RejectSecrets(comments, "comments");
         var entry = new NewTimeEntry(
             issue_id,
             string.IsNullOrWhiteSpace(project_id) ? null : WriteInput.ProjectKey(project_id),
@@ -136,6 +144,19 @@ public static class WriteInput
     public const int MaxSubject = 255;
     public const int MaxComment = 255;
     public const int MaxText = 50_000;
+
+    /// <summary>
+    /// Refuses text that contains a credential. An agent that was tricked by injected instructions would otherwise
+    /// publish secrets to everyone who can read the ticket.
+    /// </summary>
+    public static void RejectSecrets(string? text, string parameter)
+    {
+        var kinds = TextRedactor.FindSecrets(text);
+        if (kinds.Count > 0)
+            throw new UserFacingException(
+                $"'{parameter}' looks like it contains a credential ({string.Join(", ", kinds)}). Nothing was sent to Redmine. "
+                + "Never post secrets into tickets; remove it or replace it with a mask such as [secret].");
+    }
 
     public static string ProjectKey(string? value)
     {

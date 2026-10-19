@@ -87,6 +87,55 @@ public sealed partial class TextRedactor
         }
     }
 
+    /// <summary>Already masked, a template such as [PASSWORD], or nothing but filler like ****.</summary>
+    private static bool IsPlaceholderOrFiller(string value) =>
+        value.StartsWith('[') || value.All(c => c is '*' or 'x' or 'X' or '.' or '-');
+
+    /// <summary>
+    /// Secrets present in text that is about to be sent TO Redmine (a note, a new issue). Stricter than masking, because
+    /// a false alarm only asks the author to rephrase: an assignment counts only when its value looks like a real secret.
+    /// </summary>
+    public static IReadOnlyList<string> FindSecrets(string? text)
+    {
+        if (string.IsNullOrEmpty(text))
+            return [];
+
+        var kinds = new List<string>();
+        try
+        {
+            if (PrivateKey().IsMatch(text))
+                kinds.Add("private key");
+            if (Jwt().IsMatch(text))
+                kinds.Add("JWT");
+            if (KnownToken().IsMatch(text))
+                kinds.Add("API token");
+            if (UrlPassword().IsMatch(text))
+                kinds.Add("password inside a URL");
+            if (AuthorizationValue().IsMatch(text))
+                kinds.Add("Authorization credential");
+            if (SecretAssignment().Matches(text).Any(m => LooksLikeSecretValue(m.Groups["value"].Value)))
+                kinds.Add("password or key assignment");
+        }
+        catch (RegexMatchTimeoutException)
+        {
+            kinds.Add("text that could not be scanned");
+        }
+
+        return kinds;
+    }
+
+    /// <summary>A plain word such as "required" is not a secret; a digit, a symbol, or a long mixed-case string is.</summary>
+    private static bool LooksLikeSecretValue(string value)
+    {
+        var trimmed = value.TrimEnd('.', ',', ';', ':', '!', '?');
+        if (trimmed.Length < 8 || IsPlaceholderOrFiller(trimmed))
+            return false;
+
+        return trimmed.Any(char.IsDigit)
+               || trimmed.Any(c => "@#$%^&*()_+=~/\\".Contains(c, StringComparison.Ordinal))
+               || (trimmed.Length >= 16 && trimmed.Any(char.IsUpper) && trimmed.Any(char.IsLower));
+    }
+
     private string Placeholder(string kind, string value)
     {
         var key = kind + "\0" + value;
@@ -101,8 +150,7 @@ public sealed partial class TextRedactor
     {
         var value = match.Groups["value"].Value;
 
-        // Already masked, a template such as [PASSWORD], or nothing but filler like ****.
-        if (value.StartsWith('[') || value.All(c => c is '*' or 'x' or 'X' or '.' or '-'))
+        if (IsPlaceholderOrFiller(value))
             return match.Value;
 
         return match.Groups["key"].Value + match.Groups["sep"].Value + Placeholder("secret", value);

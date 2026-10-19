@@ -41,7 +41,7 @@ public static class ServeCommand
         builder.Services.AddRedmine(config, apiKeys);
 
         builder.Services
-            .AddMcpServer()
+            .AddMcpServer(options => options.ServerInstructions = ServerInstructions.Text)
             .WithStdioServerTransport()
             .WithTools<TargetTools>()
             .WithTools<ProjectTools>()

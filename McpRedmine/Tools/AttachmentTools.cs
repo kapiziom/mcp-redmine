@@ -38,13 +38,14 @@ public sealed class AttachmentTools(
             throw ProjectScope.Outside(resolved, $"Issue #{issue_id}");
 
         var redactor = TextRedactor.For(resolved);
+        var guard = InjectionGuard.For(resolved);
         redactor.AddKnownPeople([issue.Author, issue.AssignedTo, .. (issue.Attachments ?? []).Select(a => a.Author)], resolved.RedactPeople);
 
         var attachments = issue.Attachments ?? [];
         var attachment = attachments.FirstOrDefault(a => a.Id == attachment_id)
             ?? throw new UserFacingException(
                 $"Attachment #{attachment_id} is not attached to issue #{issue_id}. "
-                + (attachments.Count == 0 ? "This issue has no attachments." : "Attachments: " + string.Join(", ", attachments.Select(a => $"#{a.Id} {redactor.Redact(a.Filename)}")) + "."));
+                + (attachments.Count == 0 ? "This issue has no attachments." : "Attachments: " + string.Join(", ", attachments.Select(a => $"#{a.Id} {guard.Scan(redactor.Redact(a.Filename), "attachment name")}")) + "."));
 
         var filename = attachment.Filename ?? $"attachment-{attachment.Id}";
         if (attachment.Filesize > AttachmentReader.MaxDownloadBytes)
@@ -63,7 +64,7 @@ public sealed class AttachmentTools(
         var content = AttachmentReader.Read(filename, attachment.ContentType, bytes);
 
         // The name shown to the model (and used on disk) is masked; the real one is only used for the download URL.
-        var shownName = redactor.Redact(filename) ?? filename;
+        var shownName = guard.Scan(redactor.Redact(filename), $"attachment #{attachment.Id} name") ?? filename;
 
         string? savedPath = null;
         if (content.NeedsFile)
@@ -80,7 +81,7 @@ public sealed class AttachmentTools(
         var totalChars = 0;
         var hasMore = false;
         // Masked before paging so that offsets and numbering stay the same from one call to the next.
-        if (redactor.Redact(content.Text) is { } text)
+        if (guard.Scan(redactor.Redact(content.Text), "attachment text") is { } text)
         {
             totalChars = text.Length;
             if (start >= text.Length && text.Length > 0)
@@ -88,6 +89,9 @@ public sealed class AttachmentTools(
             slice = text.Substring(start, Math.Min(length, text.Length - start));
             hasMore = start + slice.Length < text.Length;
         }
+
+        if (content.HiddenSkipped > 0)
+            guard.AddWarning($"attachment: {content.HiddenSkipped} hidden part(s) (hidden text, rows, columns, sheets or slides) were ignored");
 
         var embedded = new List<EmbeddedImage>();
         var embeddedTotal = 0;
@@ -107,6 +111,8 @@ public sealed class AttachmentTools(
             else if (embeddedTotal > embedded.Count)
                 notes.Add($"Only the first {embedded.Count} of {embeddedTotal} embedded pictures were returned.");
         }
+
+        var wrappedSlice = slice is null ? null : guard.Guard(slice, "attachment text");
 
         var meta = new
         {
@@ -130,11 +136,13 @@ public sealed class AttachmentTools(
             saved_path = savedPath,
             embedded_pictures = embeddedTotal > 0 ? embeddedTotal : (int?)null,
             note = notes.Count == 0 ? null : string.Join(" ", notes),
+            untrusted_text_notice = ToolSupport.SecurityNotice(guard),
+            security_warnings = ToolSupport.SecurityWarnings(guard),
         };
 
         blocks.Add(new TextContentBlock { Text = ToolJson.Serialize(meta) });
         if (slice is not null)
-            blocks.Add(new TextContentBlock { Text = slice });
+            blocks.Add(new TextContentBlock { Text = wrappedSlice! });
         if (content.Image is { } image)
             blocks.Add(ImageContentBlock.FromBytes(image.Data, image.MimeType));
         foreach (var picture in embedded)

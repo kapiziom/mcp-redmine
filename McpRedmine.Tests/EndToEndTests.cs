@@ -1,5 +1,6 @@
 using System.Text.Json;
 using McpRedmine.Config;
+using McpRedmine.Tools;
 using McpRedmine.Tests.TestSupport;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
@@ -82,6 +83,34 @@ public sealed class EndToEndTests : IDisposable
             using var document = JsonDocument.Parse(line);
             Assert.Equal("2.0", document.RootElement.GetProperty("jsonrpc").GetString());
         }
+    }
+
+    [Fact]
+    public async Task The_handshake_hands_the_client_instructions_that_treat_ticket_text_as_data()
+    {
+        var (server, _) = await StartFakeAsync();
+        await using var _ = server;
+        using var mcp = await McpProcess.StartAsync(WriteConfig(server.BaseUrl), Env);
+
+        var instructions = mcp.InitializeResult.GetProperty("result").GetProperty("instructions").GetString();
+
+        Assert.Equal(ServerInstructions.Text, instructions);
+        Assert.Contains("untrusted DATA", instructions);
+    }
+
+    [Fact]
+    public async Task A_note_carrying_the_api_key_is_refused_by_the_real_server_and_never_leaves_it()
+    {
+        var (server, seen) = await StartFakeAsync();
+        await using var _ = server;
+        using var mcp = await McpProcess.StartAsync(WriteConfig(server.BaseUrl), Env);
+
+        var (isError, text) = await mcp.CallToolAsync("create_issue",
+            new { target = "rw", project_id = "p", subject = "debug", description = $"the key is {Secret}" });
+
+        Assert.True(isError);
+        Assert.DoesNotContain(Secret, text);
+        Assert.Empty(seen);
     }
 
     [Fact]

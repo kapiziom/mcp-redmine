@@ -38,6 +38,9 @@ public sealed class McpProcess : IDisposable
         get { lock (_allStdout) return [.. _allStdout]; }
     }
 
+    /// <summary>The server's answer to <c>initialize</c> (capabilities, instructions).</summary>
+    public JsonElement InitializeResult { get; private set; }
+
     public string Stderr
     {
         get { lock (_stderr) return _stderr.ToString(); }
@@ -64,7 +67,7 @@ public sealed class McpProcess : IDisposable
         process.BeginOutputReadLine();
         process.BeginErrorReadLine();
 
-        await session.RequestAsync("initialize", new
+        session.InitializeResult = await session.RequestAsync("initialize", new
         {
             protocolVersion = "2025-06-18",
             capabilities = new { },

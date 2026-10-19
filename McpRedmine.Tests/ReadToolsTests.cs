@@ -335,7 +335,7 @@ public class ReadToolsTests
 
         Assert.Contains("include=journals%2Cattachments", rig.Paths.Single());
         var journals = result.GetProperty("journals");
-        Assert.Equal("first", journals[0].GetProperty("notes").GetString());
+        Assert.Equal("first", Untrusted.Unwrap(journals[0].GetProperty("notes").GetString()));
         Assert.False(journals[1].TryGetProperty("notes", out _));
         Assert.Equal("status_id: 1 -> 2", journals[1].GetProperty("changes")[0].GetString());
         Assert.Equal("log.txt", result.GetProperty("attachments")[0].GetProperty("filename").GetString());

@@ -10,6 +10,9 @@ namespace McpRedmine.Redmine.Attachments;
 
 public sealed record EmbeddedImage(string Name, byte[] Data, string MimeType);
 
+/// <summary>Extracted text plus how many hidden parts (hidden runs, rows, columns, slides) were left out on purpose.</summary>
+public sealed record OfficeResult(string Text, int HiddenSkipped);
+
 /// <summary>
 /// Reads the text of Office Open XML files (.docx, .xlsx, .pptx) without any Office library: they are ZIP
 /// archives of XML. Untrusted input, so DTDs are prohibited, every part is size-capped and nothing is executed.
@@ -36,41 +39,50 @@ public static partial class OfficeText
 
     // ---- Word -----------------------------------------------------------------------------------------------
 
-    public static string Docx(byte[] data)
+    private sealed class HiddenCounter
+    {
+        public int Count;
+    }
+
+    public static string Docx(byte[] data) => ReadDocx(data).Text;
+
+    /// <summary>Text hidden with the "vanish" font option is skipped: people cannot see it, so it is a classic place to hide instructions.</summary>
+    public static OfficeResult ReadDocx(byte[] data)
     {
         using var zip = OpenZip(data);
         var document = LoadXml(zip, "word/document.xml") ?? throw Corrupt();
         var body = document.Root?.Element(W + "body") ?? throw Corrupt();
 
+        var hidden = new HiddenCounter();
         var text = new StringBuilder();
         foreach (var element in body.Elements())
-            WriteBlock(element, text);
-        return text.ToString().Trim();
+            WriteBlock(element, text, hidden);
+        return new OfficeResult(text.ToString().Trim(), hidden.Count);
     }
 
-    private static void WriteBlock(XElement element, StringBuilder text)
+    private static void WriteBlock(XElement element, StringBuilder text, HiddenCounter hidden)
     {
         if (element.Name == W + "p")
         {
-            var line = ParagraphText(element);
+            var line = ParagraphText(element, hidden);
             if (line.Length > 0)
                 text.Append(line).Append("\n\n");
         }
         else if (element.Name == W + "tbl")
         {
-            WriteTable(element, text);
+            WriteTable(element, text, hidden);
         }
         else if (element.Name == W + "sdt")
         {
             foreach (var child in element.Element(W + "sdtContent")?.Elements() ?? [])
-                WriteBlock(child, text);
+                WriteBlock(child, text, hidden);
         }
     }
 
-    private static string ParagraphText(XElement paragraph)
+    private static string ParagraphText(XElement paragraph, HiddenCounter hidden)
     {
         var content = new StringBuilder();
-        Walk(paragraph, content);
+        Walk(paragraph, content, hidden);
         var line = content.ToString().Trim();
         if (line.Length == 0)
             return string.Empty;
@@ -94,11 +106,19 @@ public static partial class OfficeText
         return line;
     }
 
-    private static void Walk(XElement element, StringBuilder text)
+    private static bool IsHiddenRun(XElement run)
+    {
+        var vanish = run.Element(W + "rPr")?.Element(W + "vanish");
+        return vanish is not null && vanish.Attribute(W + "val")?.Value is not ("0" or "false" or "off");
+    }
+
+    private static void Walk(XElement element, StringBuilder text, HiddenCounter hidden)
     {
         foreach (var child in element.Elements())
         {
-            if (child.Name == W + "t")
+            if (child.Name == W + "r" && IsHiddenRun(child))
+                hidden.Count++;
+            else if (child.Name == W + "t")
                 text.Append(child.Value);
             else if (child.Name == W + "tab")
                 text.Append('\t');
@@ -109,19 +129,19 @@ public static partial class OfficeText
             else if (child.Name == W + "pPr" || child.Name == W + "rPr" || child.Name == W + "delText" || child.Name == Mc + "Fallback")
                 continue; // formatting, deleted tracked-change text, and the duplicate fallback of drawings/text boxes
             else if (child.Name == W + "p")
-                Walk(child, text.Append('\n')); // a paragraph nested in a text box
+                Walk(child, text.Append('\n'), hidden); // a paragraph nested in a text box
             else
-                Walk(child, text);
+                Walk(child, text, hidden);
         }
     }
 
-    private static void WriteTable(XElement table, StringBuilder text)
+    private static void WriteTable(XElement table, StringBuilder text, HiddenCounter hidden)
     {
         var rows = new List<List<string>>();
         foreach (var row in table.Elements(W + "tr"))
         {
             var cells = row.Elements(W + "tc")
-                .Select(cell => string.Join(" / ", cell.Elements(W + "p").Select(p => Flatten(ParagraphText(p))).Where(t => t.Length > 0)))
+                .Select(cell => string.Join(" / ", cell.Elements(W + "p").Select(p => Flatten(ParagraphText(p, hidden))).Where(t => t.Length > 0)))
                 .ToList();
             if (cells.Any(c => c.Length > 0))
                 rows.Add(cells);
@@ -133,7 +153,10 @@ public static partial class OfficeText
 
     // ---- Excel ----------------------------------------------------------------------------------------------
 
-    public static string Xlsx(byte[] data)
+    public static string Xlsx(byte[] data) => ReadXlsx(data).Text;
+
+    /// <summary>Hidden sheets, rows and columns are left out (and counted): readers of the file do not see them either.</summary>
+    public static OfficeResult ReadXlsx(byte[] data)
     {
         using var zip = OpenZip(data);
         var workbook = LoadXml(zip, "xl/workbook.xml") ?? throw Corrupt();
@@ -147,6 +170,7 @@ public static partial class OfficeText
 
         var output = new StringBuilder();
         var skipped = new List<string>();
+        var hidden = new HiddenCounter();
         var sheetCount = 0;
 
         foreach (var sheet in workbook.Root?.Element(S + "sheets")?.Elements(S + "sheet") ?? [])
@@ -155,6 +179,7 @@ public static partial class OfficeText
             if (sheet.Attribute("state")?.Value is "hidden" or "veryHidden")
             {
                 skipped.Add(name + " (hidden)");
+                hidden.Count++;
                 continue;
             }
 
@@ -170,30 +195,57 @@ public static partial class OfficeText
 
             var path = target.StartsWith('/') ? target[1..] : "xl/" + target;
             output.Append("## Sheet: ").Append(name).Append("\n\n");
-            output.Append(RenderSheet(zip, path, shared, dateStyles, date1904)).Append('\n');
+            output.Append(RenderSheet(zip, path, shared, dateStyles, date1904, hidden)).Append('\n');
         }
 
         if (skipped.Count > 0)
             output.Append("(not shown: ").Append(string.Join(", ", skipped)).Append(")\n");
 
-        return output.ToString().Trim();
+        return new OfficeResult(output.ToString().Trim(), hidden.Count);
     }
 
-    private static string RenderSheet(ZipArchive zip, string path, List<string> shared, HashSet<int> dateStyles, bool date1904)
+    private static string RenderSheet(ZipArchive zip, string path, List<string> shared, HashSet<int> dateStyles, bool date1904, HiddenCounter hidden)
     {
         var entry = zip.GetEntry(path);
         if (entry is null)
             return "(sheet data missing)\n";
 
         var rows = new List<List<string>>();
+        var hiddenColumns = new HashSet<int>();
         var truncated = false;
 
         using var stream = OpenEntry(entry);
         using var reader = XmlReader.Create(stream, SafeXml());
-        while (reader.Read())
+        reader.MoveToContent();
+
+        // XNode.ReadFrom leaves the reader on the node AFTER the element, so Read() is only called when nothing was consumed;
+        // otherwise every second row of a compactly written sheet would be skipped.
+        while (!reader.EOF)
         {
-            if (reader.NodeType != XmlNodeType.Element || reader.LocalName != "row")
+            if (reader.NodeType != XmlNodeType.Element)
+            {
+                reader.Read();
                 continue;
+            }
+
+            if (reader.LocalName == "col")
+            {
+                if (reader.GetAttribute("hidden") is "1" or "true"
+                    && int.TryParse(reader.GetAttribute("min"), out var first) && int.TryParse(reader.GetAttribute("max"), out var last))
+                {
+                    for (var column = first - 1; column <= Math.Min(last - 1, MaxColumns - 1); column++)
+                        hiddenColumns.Add(column);
+                }
+
+                reader.Read();
+                continue;
+            }
+
+            if (reader.LocalName != "row")
+            {
+                reader.Read();
+                continue;
+            }
 
             if (rows.Count >= MaxRowsPerSheet)
             {
@@ -202,6 +254,12 @@ public static partial class OfficeText
             }
 
             var row = (XElement)XNode.ReadFrom(reader);
+            if (row.Attribute("hidden")?.Value is "1" or "true")
+            {
+                hidden.Count++;
+                continue;
+            }
+
             var cells = new SortedDictionary<int, string>();
             foreach (var cell in row.Elements(S + "c"))
             {
@@ -209,8 +267,15 @@ public static partial class OfficeText
                 if (column < 0 || column >= MaxColumns)
                     continue;
                 var value = CellValue(cell, shared, dateStyles, date1904);
-                if (value.Length > 0)
-                    cells[column] = value;
+                if (value.Length == 0)
+                    continue;
+                if (hiddenColumns.Contains(column))
+                {
+                    hidden.Count++;
+                    continue;
+                }
+
+                cells[column] = value;
             }
 
             if (cells.Count == 0)
@@ -337,7 +402,10 @@ public static partial class OfficeText
 
     // ---- PowerPoint -----------------------------------------------------------------------------------------
 
-    public static string Pptx(byte[] data)
+    public static string Pptx(byte[] data) => ReadPptx(data).Text;
+
+    /// <summary>Slides marked as hidden are left out (and counted).</summary>
+    public static OfficeResult ReadPptx(byte[] data)
     {
         using var zip = OpenZip(data);
         var slides = zip.Entries
@@ -348,10 +416,17 @@ public static partial class OfficeText
         if (slides.Count == 0)
             throw Corrupt();
 
+        var hiddenSlides = 0;
         var text = new StringBuilder();
         foreach (var (entry, match) in slides)
         {
             var document = LoadEntry(entry);
+            if (document.Root?.Attribute("show")?.Value == "0")
+            {
+                hiddenSlides++;
+                continue;
+            }
+
             text.Append("## Slide ").Append(match.Groups[1].Value).Append("\n\n");
             foreach (var paragraph in document.Descendants(A + "p"))
             {
@@ -371,7 +446,7 @@ public static partial class OfficeText
             text.Append('\n');
         }
 
-        return text.ToString().Trim();
+        return new OfficeResult(text.ToString().Trim(), hiddenSlides);
     }
 
     // ---- shared ---------------------------------------------------------------------------------------------
@@ -453,6 +528,7 @@ public static partial class OfficeText
     {
         DtdProcessing = DtdProcessing.Prohibit,
         XmlResolver = null,
+        IgnoreWhitespace = true,
         MaxCharactersInDocument = MaxPartBytes,
     };
 

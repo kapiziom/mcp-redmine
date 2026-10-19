@@ -17,6 +17,8 @@ public sealed class TargetTools(ITargetResolver targets, IRedmineClientFactory c
             url = t.Url,
             read_only = t.ReadOnly,
             redact_people = t.RedactPeople,
+            redact_text = t.RedactText,
+            injection_guard = t.InjectionGuard,
             project_allowlist = t.HasAllowlist ? t.ProjectAllowlist : null,
             max_rows = t.EffectiveMaxRows,
         });

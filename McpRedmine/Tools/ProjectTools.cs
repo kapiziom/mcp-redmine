@@ -63,15 +63,18 @@ public sealed class ProjectTools(ITargetResolver targets, IRedmineClientFactory 
         }
 
         var redactor = TextRedactor.For(resolved);
+        var guard = InjectionGuard.For(resolved);
         var items = rows.Select(p => new
         {
             p.Id,
             p.Identifier,
-            name = redactor.Redact(p.Name),
+            name = guard.Scan(redactor.Redact(p.Name), $"project {p.Id} name"),
             parent = ToolSupport.Ref(p.Parent),
-            description = ToolSupport.Truncate(redactor.Redact(p.Description), 200),
+            description = guard.Scan(ToolSupport.Truncate(redactor.Redact(p.Description), 200), $"project {p.Id} description"),
         }).ToList();
 
-        return ToolJson.Serialize(ToolSupport.List("projects", resolved, items, pageOffset, total, hasMore, note));
+        var envelope = ToolSupport.List("projects", resolved, items, pageOffset, total, hasMore, note);
+        ToolSupport.AddSecurity(envelope, guard);
+        return ToolJson.Serialize(envelope);
     }
 }

@@ -35,6 +35,12 @@ public sealed record TargetConfig
     /// <summary>E-mail domains (and their subdomains) that stay visible, e.g. your company or test domain.</summary>
     public IReadOnlyList<string>? KeepEmailDomains { get; init; }
 
+    /// <summary>
+    /// Treat Redmine text as untrusted: strip hidden characters, flag known prompt-injection phrases and wrap long texts
+    /// in delimiters. Does not affect what is sent to Redmine. On by default.
+    /// </summary>
+    public bool InjectionGuard { get; init; } = true;
+
     public int EffectiveMaxRows => RowLimits.Clamp(MaxRows ?? RowLimits.DefaultMaxRows);
 
     public bool HasAllowlist => ProjectAllowlist is { Count: > 0 };

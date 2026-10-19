@@ -5,7 +5,7 @@ namespace McpRedmine.Redmine.Attachments;
 public sealed record ImagePayload(byte[] Data, string MimeType);
 
 /// <summary>What could be made of an attachment: text, an image, or neither (then it is saved to disk instead).</summary>
-public sealed record AttachmentContent(AttachmentKind Kind, string? Text, ImagePayload? Image, string? Note)
+public sealed record AttachmentContent(AttachmentKind Kind, string? Text, ImagePayload? Image, string? Note, int HiddenSkipped = 0)
 {
     public bool NeedsFile => Text is null && Image is null;
 }
@@ -60,16 +60,16 @@ public static class AttachmentReader
     {
         try
         {
-            var text = kind switch
+            var result = kind switch
             {
-                AttachmentKind.Docx => OfficeText.Docx(bytes),
-                AttachmentKind.Xlsx => OfficeText.Xlsx(bytes),
-                _ => OfficeText.Pptx(bytes),
+                AttachmentKind.Docx => OfficeText.ReadDocx(bytes),
+                AttachmentKind.Xlsx => OfficeText.ReadXlsx(bytes),
+                _ => OfficeText.ReadPptx(bytes),
             };
 
-            return text.Length == 0
-                ? new AttachmentContent(kind, null, null, "The document contains no readable text (it may consist only of images); the original was saved.")
-                : new AttachmentContent(kind, text, null, null);
+            return result.Text.Length == 0
+                ? new AttachmentContent(kind, null, null, "The document contains no readable text (it may consist only of images); the original was saved.", result.HiddenSkipped)
+                : new AttachmentContent(kind, result.Text, null, null, result.HiddenSkipped);
         }
         catch (UserFacingException ex)
         {

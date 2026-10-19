@@ -13,7 +13,7 @@ public sealed class ApiKeyHandler(TargetConfig target, ApiKeyResolver resolver) 
 
     private readonly Uri _origin = new(target.Url);
 
-    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
+    protected override async Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {
         var uri = request.RequestUri;
         if (uri is null || !uri.IsAbsoluteUri || !IsSameOrigin(uri))
@@ -25,10 +25,25 @@ public sealed class ApiKeyHandler(TargetConfig target, ApiKeyResolver resolver) 
                 $"No API key is available for target '{target.Name}'. Run 'accounts add' to store one"
                 + (target.ApiKeyEnv is null ? "." : $" or set the {target.ApiKeyEnv} environment variable."));
 
-        request.Headers.Remove(HeaderName);
-        request.Headers.TryAddWithoutValidation(HeaderName, resolved.Key.Reveal());
+        var secret = resolved.Key.Reveal();
 
-        return base.SendAsync(request, cancellationToken);
+        // Last line of defence against an agent being tricked into posting the key into a ticket.
+        var leaksInUrl = uri.ToString().Contains(secret, StringComparison.Ordinal);
+        var leaksInBody = false;
+        if (request.Content is not null)
+        {
+            await request.Content.LoadIntoBufferAsync(cancellationToken);
+            leaksInBody = (await request.Content.ReadAsStringAsync(cancellationToken)).Contains(secret, StringComparison.Ordinal);
+        }
+
+        if (leaksInUrl || leaksInBody)
+            throw new RedmineException(RedmineErrorKind.Other,
+                $"Refused: the request to target '{target.Name}' contains the API key. Nothing was sent. Do not put credentials into issues, notes or comments.");
+
+        request.Headers.Remove(HeaderName);
+        request.Headers.TryAddWithoutValidation(HeaderName, secret);
+
+        return await base.SendAsync(request, cancellationToken);
     }
 
     private bool IsSameOrigin(Uri uri) =>

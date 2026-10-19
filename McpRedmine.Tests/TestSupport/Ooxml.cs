@@ -54,6 +54,14 @@ public static class Ooxml
         Zip(slideTexts.Select((text, i) => Part($"ppt/slides/slide{i + 1}.xml",
             $"""<p:sld xmlns:p="p" xmlns:a="{ANs}"><p:cSld><p:spTree><p:sp><p:txBody><a:p><a:r><a:t>{text}</a:t></a:r></a:p></p:txBody></p:sp></p:spTree></p:cSld></p:sld>""")));
 
+    /// <summary>A workbook with one sheet whose XML is given as is (no shared strings; use inline strings).</summary>
+    public static byte[] SingleSheetXlsx(string sheetXml) => Zip(
+    [
+        Part("xl/workbook.xml", $"""<workbook xmlns="{SNs}" xmlns:r="{RNs}"><sheets><sheet name="Data" sheetId="1" r:id="rId1"/></sheets></workbook>"""),
+        Part("xl/_rels/workbook.xml.rels", """<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Target="worksheets/sheet1.xml"/></Relationships>"""),
+        Part("xl/worksheets/sheet1.xml", sheetXml),
+    ]);
+
     /// <summary>One visible sheet "Plan" (sharedStrings, a date style, a boolean, a float) and one hidden sheet.</summary>
     public static byte[] Xlsx()
     {

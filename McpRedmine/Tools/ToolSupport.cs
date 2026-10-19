@@ -24,15 +24,28 @@ internal static class ToolSupport
         return text[..maxLength] + $"... [truncated, {text.Length - maxLength} more characters]";
     }
 
-    /// <summary>A custom field value with text masked: strings and arrays of strings are scanned, other JSON is kept as is.</summary>
-    public static object? RedactValue(TextRedactor redactor, System.Text.Json.JsonElement value) => value.ValueKind switch
+    /// <summary>A custom field value with text masked and scanned: strings and arrays of strings are handled, other JSON is kept as is.</summary>
+    public static object? CleanValue(TextRedactor redactor, InjectionGuard guard, System.Text.Json.JsonElement value, string field) => value.ValueKind switch
     {
-        System.Text.Json.JsonValueKind.String => redactor.Redact(value.GetString()),
+        System.Text.Json.JsonValueKind.String => guard.Scan(redactor.Redact(value.GetString()), field),
         System.Text.Json.JsonValueKind.Array => value.EnumerateArray()
-            .Select(item => item.ValueKind == System.Text.Json.JsonValueKind.String ? (object?)redactor.Redact(item.GetString()) : item)
+            .Select(item => item.ValueKind == System.Text.Json.JsonValueKind.String ? (object?)guard.Scan(redactor.Redact(item.GetString()), field) : item)
             .ToList(),
         _ => value,
     };
+
+    /// <summary>Always call this last: warnings are collected while the fields are being processed.</summary>
+    public static string? SecurityNotice(InjectionGuard guard) => guard.Enabled ? InjectionGuard.Notice : null;
+
+    public static IReadOnlyList<string>? SecurityWarnings(InjectionGuard guard) => guard.Warnings.Count > 0 ? guard.Warnings : null;
+
+    public static void AddSecurity(Dictionary<string, object?> envelope, InjectionGuard guard)
+    {
+        if (SecurityNotice(guard) is { } notice)
+            envelope["untrusted_text_notice"] = notice;
+        if (SecurityWarnings(guard) is { } warnings)
+            envelope["security_warnings"] = warnings;
+    }
 
     public static object? Ref(RedmineIdName? value) =>
         value is null ? null : new { value.Id, value.Name };

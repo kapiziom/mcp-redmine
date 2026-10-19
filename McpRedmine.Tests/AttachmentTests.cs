@@ -351,7 +351,7 @@ public sealed class AttachmentToolsTests : IDisposable
 
         Assert.True(Meta(first).GetProperty("has_more").GetBoolean());
         Assert.Equal(3000, Meta(first).GetProperty("text_characters").GetInt32());
-        Assert.Equal(1000, ((TextContentBlock)second.Content[1]).Text.Length);
+        Assert.Equal(1000, Untrusted.Unwrap(((TextContentBlock)second.Content[1]).Text).Length);
         Assert.Equal(2000, Meta(second).GetProperty("next_offset").GetInt32());
         await Assert.ThrowsAsync<UserFacingException>(() => tools.GetAttachment(42, 12, offset: 99999));
     }

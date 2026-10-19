@@ -224,10 +224,10 @@ public sealed class RedactionInToolsTests : IDisposable
         using var document = JsonDocument.Parse(json);
         var root = document.RootElement;
         Assert.Matches(@"^Login fails for \[email-\d+\]$", root.GetProperty("subject").GetString());
-        Assert.Contains("password=[secret-", root.GetProperty("description").GetString());
-        Assert.Contains("Reported by A.K. (#5).", root.GetProperty("description").GetString());
+        Assert.Contains("password=[secret-", Untrusted.Unwrap(root.GetProperty("description").GetString()));
+        Assert.Contains("Reported by A.K. (#5).", Untrusted.Unwrap(root.GetProperty("description").GetString()));
         Assert.Equal(4, root.GetProperty("custom_fields")[2].GetProperty("value").GetInt32());
-        Assert.StartsWith("Asked A.K. (#5), she wrote from [email-", root.GetProperty("journals")[0].GetProperty("notes").GetString(), StringComparison.Ordinal);
+        Assert.StartsWith("Asked A.K. (#5), she wrote from [email-", Untrusted.Unwrap(root.GetProperty("journals")[0].GetProperty("notes").GetString()), StringComparison.Ordinal);
         Assert.Matches(@"^\[email-\d+\]$", root.GetProperty("attachments")[0].GetProperty("filename").GetString());
     }
 
@@ -243,7 +243,7 @@ public sealed class RedactionInToolsTests : IDisposable
         var subject = document.RootElement.GetProperty("subject").GetString()!;
         var description = document.RootElement.GetProperty("description").GetString()!;
         var mask = System.Text.RegularExpressions.Regex.Match(subject, @"\[email-\d+\]").Value;
-        Assert.Contains($"or {mask},", description);
+        Assert.Contains($"or {mask},", Untrusted.Unwrap(description));
     }
 
     [Fact]
