@@ -91,6 +91,7 @@ Without an OS credential store (e.g. a headless Linux box) the key falls back to
 | `allow_insecure_http` | Permit plain `http://` (the key would travel unencrypted). |
 | `redact_people` | Default `true`: people appear as initials plus id (`J.K. (#12)`). |
 | `redact_text` | Default `true`: e-mail addresses, keys/tokens/passwords and checksum-valid PESEL/NIP/IBAN/card numbers in free text become placeholders such as `[email-1]`, `[secret-1]`. Images and saved PDFs are not scanned. |
+| `injection_guard` | Default `true`: hidden characters are stripped, known prompt-injection phrases are reported in `security_warnings`, and long texts are wrapped in `[[UNTRUSTED-...]]` markers. This reduces risk but does not make injection impossible; keep write tools unapproved by default. |
 | `keep_email_domains` | E-mail domains (and their subdomains) that stay visible, e.g. `["example.com"]`. |
 
 Override the location with the `REDMINE_MCP_CONFIG` environment variable.

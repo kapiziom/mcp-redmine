@@ -9,6 +9,7 @@ A local [Model Context Protocol](https://modelcontextprotocol.io/) (MCP) server 
 - **Multiple Redmine instances** in one server (different versions, behind a VPN, private CA). Every tool takes a `target`.
 - **Read-only by default.** Write tools are rejected server-side unless a target is explicitly configured with `read_only: false`.
 - **Secrets stay out of the model's reach.** The API key lives in the OS credential store (Windows Credential Manager, macOS Keychain, libsecret) and is sent only in the `X-Redmine-API-Key` header. It never appears in MCP client configs, logs, tool parameters or tool results.
+- **Prompt-injection hardening.** Ticket and document text is treated as untrusted data: hidden characters are stripped, known attack phrases are flagged, long texts are wrapped in unforgeable markers, hidden parts of Office files are skipped, the model is told so in the server instructions, and writes that contain credentials (including the API key itself) are refused.
 - **Privacy filters on by default.** People are shown as initials plus id (`J.K. (#12)`). E-mail addresses, API keys, tokens, passwords and checksum-valid PESEL/NIP/IBAN/card numbers in free text are replaced with placeholders such as `[email-1]`.
 - **Attachments reach the agent.** Word, Excel, PowerPoint and text files are returned as text, screenshots as images, everything else is saved to disk.
 - **Safe networking.** HTTPS by default, per-target custom CA instead of disabling certificate validation, redirects are never followed, reads are retried and writes never are.
@@ -99,6 +100,7 @@ The config file holds no secrets: `%APPDATA%\RedmineMcp\config.json` on Windows,
 | `project_allowlist` | none | Only these projects (identifier or id) are accessible through this target. Sub-projects are not implied. |
 | `redact_people` | `true` | Show people as initials plus id. |
 | `redact_text` | `true` | Mask e-mails, secrets and national/financial identifiers in free text. |
+| `injection_guard` | `true` | Strip hidden characters, flag injection phrases, wrap long texts in `[[UNTRUSTED-...]]` markers. |
 | `keep_email_domains` | none | E-mail domains (and subdomains) that stay visible. |
 | `api_key_env` | none | Environment variable to read the key from when no stored key exists. |
 | `allow_insecure_http` | `false` | Permit plain `http://` (the key would travel unencrypted). |
@@ -108,6 +110,7 @@ More detail, including Redmine compatibility notes, is in [McpRedmine/README.md]
 ## Security notes
 
 - The API key is requested only by `accounts add` (hidden input). There is no command-line option, environment variable or tool parameter for pasting it, and it is never written to MCP client configs.
+- **Prompt injection cannot be filtered out completely.** The guard lowers the risk (see above), but the real protection is structural: keep targets `read_only` unless you need writes, use a bot account with a restricted role, and do not auto-approve the write tools (`create_issue`, `add_issue_note`, `log_time`) or shell commands in your MCP client while the agent is reading tickets from untrusted authors.
 - Masking is a safety net, not a guarantee: names mentioned inside free text are masked only when they belong to users of the same issue, and images (screenshots, pictures embedded in documents) and saved PDFs are passed through unchanged.
 - If a project contains data that must not leave your organization, restrict the target with `project_allowlist` or do not expose it at all.
 
